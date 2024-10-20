@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Edit Post</title>
+</head>
+<body>
+    <h1>Edit Post</h1>
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        {{ form.as_p }}
+        <button type="submit">Submit</button> <!-- Changed to button -->
+    </form>
+    <a href="{% url 'index' %}">Cancel</a> <!-- Link to cancel and go back -->
+</body>
+</html>
+

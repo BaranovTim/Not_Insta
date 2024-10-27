@@ -2,16 +2,63 @@ from django.contrib.auth.decorators import login_required
 from.forms import PostForm
 from rest_framework.viewsets import ModelViewSet
 from .serializers import PostSerializer
-from .models import Post, Like
+from .models import Post, Like, Comment
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from django.contrib.auth import login, authenticate
 from django.shortcuts import render, redirect
 from .forms import LoginForm, CommentForm
 from django.shortcuts import get_object_or_404
+from rest_framework.exceptions import PermissionDenied
+from .serializers import CommentSerializer
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+
 
 class PostViewSet(ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
 
+    def get_permissions(self):
+        if self.action in ['create', 'update', 'destroy']:
+            self.permission_classes = [IsAuthenticated]
+        else:
+            self.permission_classes = [IsAuthenticatedOrReadOnly]
+        return super().get_permissions()
+
+    def perform_create(self, serializer):
+        serializer.save(author=self.request.user)
+
+    def perform_update(self, serializer):
+        if serializer.instance.author != self.request.user:
+            raise PermissionDenied("You are not allowed to edit this post.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance.author != self.request.user:
+            raise PermissionDenied("You are not allowed to delete this post.")
+        instance.delete()
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def add_comment(self, request, pk=None):
+        post = self.get_object()
+        serializer = CommentSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save(author=request.user, post=post)
+            return Response(serializer.data)
+        return Response(serializer.errors, status=400)
+
+    @action(detail=True, methods=['post'], permission_classes=[IsAuthenticated])
+    def toggle_like(self, request, pk=None):
+        post = self.get_object()
+        like, created = Like.objects.get_or_create(user=request.user, post=post)
+        if not created:
+            like.delete()
+            post.likes -= 1
+        else:
+            post.likes += 1
+        post.save()
+        return Response({'likes_count': post.like_set.count()})
 
 def index(request):
     posts = Post.objects.all()
@@ -34,14 +81,12 @@ def index(request):
     else:
         comment_form = CommentForm()
 
-    # Получение комментариев по постам
-    comments_by_post = {post.id: post.comments.all() for post in posts}
 
     return render(request, 'main/index.html', {
         'Posts': posts,
         'liked_posts': liked_posts,
         'comment_form': comment_form,
-        'comments_by_post': comments_by_post,
+        'comments': Comment.objects.all()
     })
 
 
@@ -51,13 +96,14 @@ def post(request):
     if request.method == 'POST':
         form = PostForm(request.POST, request.FILES)
         if form.is_valid():
-            post = form.save()
+            post = form.save(commit=False)
             post.author = request.user
             post.save()
             return redirect('index')
     else:
         form = PostForm()
     return render(request, 'main/post.html', {"form": form})
+
 
 @login_required
 def post_edit(request, post_id):

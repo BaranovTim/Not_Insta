@@ -55,18 +55,17 @@
                     {% endif %}
 
                     <h4>Comments:</h4>
-                            {% with comments=comments_by_post %}
-                                {% for comment in comments %}
-                                    <div class="comment">
-                                        <p class="user">{{ comment.author }}</p>
-                                        <p>{{ comment.text }}</p>
-                                        <h6 class="date">{{ comment.date|date:"d M" }}</h6>
-                                    </div>
-                                {% empty %}
-                                    <p>No comments yet.</p>
-                                {% endfor %}
-                            {% endwith %}
-
+                        {% if el.comments.count > 0 %}
+                            {% for comment in el.comments.all %}
+                                <div class="comment">
+                                    <p class="user">{{ comment.author }}</p>
+                                    <p>{{ comment.text }}</p>
+                                    <h6 class="date">{{ comment.date|date:"d M" }}</h6>
+                                </div>
+                            {% endfor %}
+                        {% else %}
+                            <p>No comments yet.</p>
+                        {% endif %}
 
                 </div>
 
